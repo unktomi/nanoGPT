@@ -6,16 +6,16 @@ from blamed_parameter import BlamedParameter
 class BlameLinear(nn.Linear):
     def __init__(self, in_features, out_features, bias=True):
         super().__init__(in_features, out_features, bias=bias)
-        # Replace standard parameters with blamed ones
-        self.weight = BlamedParameter(self.weight.data)
+        # Wrap parameters with blame tracking
+        self.blamed_weight = BlamedParameter(self.weight)
         if bias:
-            self.bias = BlamedParameter(self.bias.data)
+            self.blamed_bias = BlamedParameter(self.bias)
 
     def forward(self, x):
         # Track activations during forward pass
-        self.weight.update(x)
+        self.blamed_weight.update(x)
         out = F.linear(x, self.weight)
         if self.bias is not None:
-            self.bias.update(torch.ones_like(out))
+            self.blamed_bias.update(torch.ones_like(out))
             out = out + self.bias
         return out
