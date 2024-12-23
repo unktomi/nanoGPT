@@ -1,6 +1,7 @@
 import math
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 from blame_mlp import BlameMLP
 from blamed_parameter import BlamedParameter
 from model import LayerNorm, CausalSelfAttention
@@ -35,7 +36,7 @@ class BlameGPT(nn.Module):
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         self.transformer.wte.weight = self.lm_head.weight
 
-        # Init weights
+        # Initialize weights
         self.apply(self._init_weights)
         for pn, p in self.named_parameters():
             if pn.endswith('c_proj.weight'):
@@ -73,24 +74,36 @@ class BlameGPT(nn.Module):
 
         return logits, loss
 
+    def get_blamed_parameters(self):
+        blamed_params = []
+        for module in self.modules():
+            if hasattr(module, 'blamed_weight'):
+                blamed_params.append(module.blamed_weight)
+            if hasattr(module, 'blamed_bias') and module.blamed_bias is not None:
+                blamed_params.append(module.blamed_bias)
+        return blamed_params
+
+    def get_regular_parameters(self):
+        # Get all parameters that aren't handled by blamed parameters
+        blamed_modules = set(id(m) for m in self.modules() if hasattr(m, 'blamed_weight'))
+        regular_params = []
+        for name, param in self.named_parameters():
+            if not any(id(m) == id(param) for m in blamed_modules):
+                regular_params.append(param)
+        return regular_params
+
     def configure_optimizers(self, weight_decay, learning_rate, betas, device_type):
         # Get blamed and regular parameters
-        blamed_params = []
-        other_params = []
-        
-        for n, p in self.named_parameters():
-            if not p.requires_grad:
-                continue
-            if isinstance(p, BlamedParameter):
-                blamed_params.append(p)
-            else:
-                other_params.append(p)
+        blamed_params = self.get_blamed_parameters()
+        regular_params = self.get_regular_parameters()
 
-        # Create optimizers for each parameter type
+        print(f'Number of blamed parameters: {len(blamed_params)}')
+        print(f'Number of regular parameters: {len(regular_params)}')
+
         from blame_optimizer import BlameOptimizer
         optimizers = [
             BlameOptimizer(blamed_params, lr=learning_rate),
-            torch.optim.AdamW(other_params, lr=learning_rate, betas=betas)
+            torch.optim.AdamW(regular_params, lr=learning_rate, betas=betas)
         ]
 
         return optimizers
