@@ -31,7 +31,7 @@ model_args = dict(
     n_embd=128,     # Smaller embedding dimension
     block_size=64,  # Smaller context window
     bias=False,
-    vocab_size=50304,
+    vocab_size=65,  # Shakespeare vocab size
     dropout=0.0
 )
 
@@ -57,11 +57,11 @@ optimizers = model.configure_optimizers(
 
 def get_batch(split):
     # Download the data first if needed using prepare.py
-    data_dir = os.path.join('data', 'openwebtext')
+    data_dir = os.path.join('data', 'shakespeare')
     
     if not os.path.exists(data_dir):
-        print("Data not found. Please run prepare.py first!")
-        exit(1)
+        print("Preparing Shakespeare dataset...")
+        os.system('python data/shakespeare/prepare.py')
         
     data = np.memmap(os.path.join(data_dir, f'{split}.bin'), dtype=np.uint16, mode='r')
     ix = torch.randint(len(data) - model_args['block_size'], (batch_size,))
