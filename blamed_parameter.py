@@ -1,12 +1,17 @@
 import torch
 import torch.nn as nn
 
-class BlamedParameter(nn.Parameter):
-    def __init__(self, data, requires_grad=True):
-        super().__init__(data, requires_grad=requires_grad)
-        self.activation = torch.zeros_like(data)  # reward
-        self.blame = torch.zeros_like(data)       # penalty
-        self.decay = 0.99
+class BlamedParameter(torch.nn.Parameter):
+    def __new__(cls, data, requires_grad=True):
+        # Create the Parameter properly
+        instance = super().__new__(cls, data, requires_grad=requires_grad)
+        
+        # Add our tracking tensors
+        instance.activation = torch.zeros_like(data)
+        instance.blame = torch.zeros_like(data)
+        instance.decay = 0.99
+        
+        return instance
 
     def update(self, current_activation):
         # Update activation (reward)
